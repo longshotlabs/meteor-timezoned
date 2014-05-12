@@ -1,0 +1,12 @@
+{
+  "name": "timezoned",
+  "description": "A high-level time zone package for Meteor",
+  "homepage": "https://github.com/aldeed/meteor-timezoned",
+  "author": "Eric Dobbertin (http://dairystatedesigns.com)",
+  "version": "0.1.0",
+  "git": "https://github.com/aldeed/meteor-timezoned.git",
+  "packages": {
+    "moment-timezone": {},
+    "geocoder": {}
+  }
+}
