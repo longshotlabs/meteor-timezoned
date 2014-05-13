@@ -6,11 +6,11 @@ function callTZAPI(data, callback) {
 	data = _.extend({}, baseParamsTZ, data);
 	if (callback) {
 		return HTTP.get(gtzUrl, {params: data}, function (error, tz) {
-			callback(error, tz.data);
+			callback(error, tz.data && tz.data.timeZoneId);
 		});
 	} else {
 		var tz = HTTP.get(gtzUrl, {params: data});
-		return tz.data;
+		return tz.data && tz.data.timeZoneId;
 	}
 }
 
@@ -18,6 +18,15 @@ function checkCallback(cb) {
 	if (Meteor.isClient && typeof cb !== "function") {
 		throw new Error("TimeZoned: You must provide a callback on the client");
 	}
+}
+
+if (Meteor.isServer) {
+	Meteor.methods({
+		"_TimeZoned_getTimeZoneForAddress": function (address) {
+			this.unblock();
+			return TimeZoned.getTimeZoneForAddress(address);
+		}
+	});
 }
 
 TimeZoned = {
@@ -29,23 +38,32 @@ TimeZoned = {
 	getTimeZoneForAddress: function getTimeZoneForAddress(address, callback) {
 		checkCallback(callback);
 
+		// On the client, we actually proxy through the server
+		if (Meteor.isClient) {
+			Meteor.call("_TimeZoned_getTimeZoneForAddress", address, callback);
+			return;
+		}
+
 		var geo = new GeoCoder();
 
 		if (callback) {
-			// TODO need to add client side/callback API for geocoder
 			return geo.geocode(address, function (error, result) {
 				if (error) {
 					callback(error);
 				} else {
-					TimeZoned.getTimeZoneForCoords(result.latitude, result.longitude, callback);
+					if (!result || !result[0] || !result[0].latitude || !result[0].longitude) {
+						callback(new Error('TimeZoned: Unable to geocode "' + address + '"'));
+					} else {
+						TimeZoned.getTimeZoneForCoords(result[0].latitude, result[0].longitude, callback);
+					}
 				}
 			});
 		} else {
 			var result = geo.geocode(address);
-			if (!result || !result.latitude || !result.longitude) {
+			if (!result || !result[0] || !result[0].latitude || !result[0].longitude) {
 				throw new Error('TimeZoned: Unable to geocode "' + address + '"');
 			}
-			return TimeZoned.getTimeZoneForCoords(result.latitude, result.longitude, callback);
+			return TimeZoned.getTimeZoneForCoords(result[0].latitude, result[0].longitude);
 		}
 	},
 	getTimeZoneForCoords: function getTimeZoneForCoords(lat, lon, callback) {
@@ -55,19 +73,42 @@ TimeZoned = {
 	},
 	// http://www.w3.org/TR/html-markup/datatypes.html#form.data.datetime-local
 	getOffsetStringForTimeZone: function getOffsetStringForTimeZone(localDateTimeString, timezone) {
-
+		return moment.tz(localDateTimeString, timezone).format("ZZ");
 	},
 	// http://www.w3.org/TR/html-markup/datatypes.html#form.data.datetime-local
 	getDateObjectForTimeZone: function getDateObjectForTimeZone(localDateTimeString, timezone) {
-		//TODO support callback
-		var offset = TimeZoned.getOffsetStringForTimeZone(localDateTimeString, timezone);
-		return new Date(localDateTimeString+offset);
+		return moment.tz(localDateTimeString, timezone).toDate();
 	},
 	// http://www.w3.org/TR/html-markup/datatypes.html#form.data.datetime-local
-	getDateObjectForAddress: function getDateObjectForTimeZone(localDateTimeString, address) {
-		//TODO support callback
-		var timezone = TimeZoned.getTimeZoneForAddress(address);
-		var offset = TimeZoned.getOffsetStringForTimeZone(localDateTimeString, timezone);
-		return new Date(localDateTimeString+offset);
+	getDateObjectForAddress: function getDateObjectForAddress(localDateTimeString, address, callback) {
+		checkCallback(callback);
+		if (callback) {
+			TimeZoned.getTimeZoneForAddress(address, function (error, timezone) {
+				if (error) {
+					callback(error);
+				} else {
+					callback(null, TimeZoned.getDateObjectForTimeZone(localDateTimeString, timezone));
+				}
+			});
+		} else {
+			var timezone = TimeZoned.getTimeZoneForAddress(address);
+			return TimeZoned.getDateObjectForTimeZone(localDateTimeString, timezone);
+		}
+	},
+	// http://www.w3.org/TR/html-markup/datatypes.html#form.data.datetime-local
+	getDateObjectForCoords: function getDateObjectForCoords(localDateTimeString, lat, lon, callback) {
+		checkCallback(callback);
+		if (callback) {
+			TimeZoned.getTimeZoneForCoords(lat, lon, function (error, timezone) {
+				if (error) {
+					callback(error);
+				} else {
+					callback(null, TimeZoned.getDateObjectForTimeZone(localDateTimeString, timezone));
+				}
+			});
+		} else {
+			var timezone = TimeZoned.getTimeZoneForCoords(lat, lon);
+			return TimeZoned.getDateObjectForTimeZone(localDateTimeString, timezone);
+		}
 	}
 };
