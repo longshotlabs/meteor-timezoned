@@ -77,7 +77,8 @@ TimeZoned = {
 	},
 	// http://www.w3.org/TR/html-markup/datatypes.html#form.data.datetime-local
 	getDateObjectForTimeZone: function getDateObjectForTimeZone(localDateTimeString, timezone) {
-		return moment.tz(localDateTimeString, timezone).toDate();
+		var offset = TimeZoned.getOffsetStringForTimeZone(localDateTimeString, timezone);
+		return new Date(localDateTimeString + offset);
 	},
 	// http://www.w3.org/TR/html-markup/datatypes.html#form.data.datetime-local
 	getDateObjectForAddress: function getDateObjectForAddress(localDateTimeString, address, callback) {
@@ -86,12 +87,17 @@ TimeZoned = {
 			TimeZoned.getTimeZoneForAddress(address, function (error, timezone) {
 				if (error) {
 					callback(error);
+				} else if (!timezone) {
+					callback(new Error("getDateObjectForAddress: Couldn't get timezone for address. Possibly due to Google API throttling."));
 				} else {
 					callback(null, TimeZoned.getDateObjectForTimeZone(localDateTimeString, timezone));
 				}
 			});
 		} else {
 			var timezone = TimeZoned.getTimeZoneForAddress(address);
+			if (!timezone) {
+				throw new Error("getDateObjectForAddress: Couldn't get timezone for address. Possibly due to Google API throttling.");
+			}
 			return TimeZoned.getDateObjectForTimeZone(localDateTimeString, timezone);
 		}
 	},
@@ -102,12 +108,17 @@ TimeZoned = {
 			TimeZoned.getTimeZoneForCoords(lat, lon, function (error, timezone) {
 				if (error) {
 					callback(error);
+				} else if (!timezone) {
+					callback(new Error("getDateObjectForCoords: Couldn't get timezone for address. Possibly due to Google API throttling."));
 				} else {
 					callback(null, TimeZoned.getDateObjectForTimeZone(localDateTimeString, timezone));
 				}
 			});
 		} else {
 			var timezone = TimeZoned.getTimeZoneForCoords(lat, lon);
+			if (!timezone) {
+				throw new Error("getDateObjectForCoords: Couldn't get timezone for address. Possibly due to Google API throttling.");
+			}
 			return TimeZoned.getDateObjectForTimeZone(localDateTimeString, timezone);
 		}
 	}
