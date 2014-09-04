@@ -5,10 +5,8 @@ A high-level time zone package for Meteor. Aims to have the same simple API on c
 
 ## Installation
 
-Install using Meteorite:
-
 ```bash
-$ mrt add timezoned
+$ meteor add aldeed:timezoned
 ```
 
 ## Usage
